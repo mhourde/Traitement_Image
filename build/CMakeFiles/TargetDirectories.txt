@@ -1,0 +1,13 @@
+/home/mhe9472/2A/Trait_Images/codes_TP/build/CMakeFiles/edit_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/CMakeFiles/rebuild_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/CMakeFiles/edit_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/CMakeFiles/rebuild_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tp/CMakeFiles/kmeans.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tp/CMakeFiles/edit_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tp/CMakeFiles/rebuild_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/display_image.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/load_modify_image.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/mat_the_basic_image_container.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/tutorials.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/edit_cache.dir
+/home/mhe9472/2A/Trait_Images/codes_TP/build/src/tutorials/CMakeFiles/rebuild_cache.dir
