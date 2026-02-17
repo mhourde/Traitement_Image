@@ -19,7 +19,17 @@ auto div(double a, double b){
     }
 }
 
-Mat kmeans_perso()
+Mat kmeans_perso(Mat img, int k, int iter){
+    int H = img.rows;
+    int L = img.cols;
+    double lambda = 1;
+    Mat fsp(H*L, 5, CV_32F);
+    for(i=0, i<L, i++){
+        for(j=0, j<H, j++){
+            
+        }
+    }
+}
 
 int main(int argc, char** argv)
 {
