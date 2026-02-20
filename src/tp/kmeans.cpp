@@ -26,7 +26,18 @@ Mat kmeans_perso(Mat img, int k, int iter){
     Mat fsp(H*L, 5, CV_32F);
     for(i=0, i<L, i++){
         for(j=0, j<H, j++){
-            
+            fsp.at<float>(i*H+j,0) = img.at<float>(i,j,0);
+        }
+    }
+    min_b=min(fsp);
+    max_b=max(fsp);
+
+
+    //Sinon :
+    Mat niv_gris(H,L,5, CV_32F);
+    for(i=0, i<L, i++){
+        for(j=0, j<H, j++){
+            niv_gris(i,j)=0.0722*img.at<float>(i,j,0)+0.7152*img.at<float>(i,j,1)+0.2126*img.at<float>(i,j,2)
         }
     }
 }
