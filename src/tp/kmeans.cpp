@@ -1,4 +1,5 @@
 #include "ocv_utils.hpp"
+#include <filesystem>
 
 #include <opencv2/core.hpp>
 #include <opencv2/imgcodecs.hpp>
@@ -7,9 +8,13 @@
 #include <opencv2/imgcodecs.hpp>
 #include <iostream>
 #include <string>
+#include <cmath>
+#include <limits>
+#include <utility>
 
 using namespace cv;
 using namespace std;
+using std::filesystem::path;
 
 auto div(double a, double b){
     if (b==0.0){
@@ -29,7 +34,7 @@ auto dist2_5 = [](const float* a, const float* b) -> float {
 };
 
 /**
- * K-means "perso" (Lloyd) pour segmentation.
+ * K-means "perso" pour segmentation.
  *
  * - img : image d'entrée (CV_8UC1, CV_8UC3, ou autre convertible)
  * - k   : nombre de clusters
@@ -38,9 +43,7 @@ auto dist2_5 = [](const float* a, const float* b) -> float {
  * Retour :
  * - Mat labelsImg (H x W) de type CV_32S, où labelsImg(y,x) ∈ {0,...,k-1}
  *
- * Remarque importante :
- * - Ici on fait un clustering dans un feature space 5D : (B,G,R, λ*x~, λ*y~)
- *   -> permet plus de cohérence spatiale qu'uniquement la couleur.
+ * On fait un clustering dans un feature space 5D : (B,G,R, λ*x~, λ*y~) -> permet plus de cohérence spatiale qu'uniquement la couleur.
  * - Pour faire couleur seule : mettre LAMBDA = 0.f.
  */
 Mat kmeans_perso(Mat img, int k, int iter){
@@ -63,7 +66,6 @@ Mat kmeans_perso(Mat img, int k, int iter){
     cv::RNG rng((uint64)cv::getTickCount());
 
     // Initialisation : choisir k pixels aléatoires comme centres init
-    // features = (B,G,R, λ*x~, λ*y~)
     for (int c = 0; c < k; ++c) {
         int idx = rng.uniform(0, N);
         int y = idx / W;
@@ -80,10 +82,9 @@ Mat kmeans_perso(Mat img, int k, int iter){
 
     Mat newCenters(k, 5, CV_32F);
     std::vector<int> counts(k, 0);
-
     for (int it = 0; it < iter; ++it) {
         bool changed = false;
-
+        //Attribuer un cluster à chaque pixel
         for (int i = 0; i < N; ++i) {
             int y = i / W;
             int x = i - y * W;
@@ -116,10 +117,10 @@ Mat kmeans_perso(Mat img, int k, int iter){
                 lab = best; changed = true; 
             }
         }
-
+        //Recalculer les centres
         newCenters.setTo(0);
         std::fill(counts.begin(), counts.end(), 0);
-
+        //accumuler les features des pixels appartenant à chaque cluster
         for (int i = 0; i < N; ++i) {
             int c = labels.at<int>(i, 0);
             int y = i / W;
@@ -136,7 +137,7 @@ Mat kmeans_perso(Mat img, int k, int iter){
 
             counts[c]++;
         }
-
+        //Moyenner pour obtenir les nouveaux centres
         for (int c = 0; c < k; ++c) {
             float* ctr = newCenters.ptr<float>(c);
             if (counts[c] > 0) {
@@ -165,6 +166,71 @@ Mat kmeans_perso(Mat img, int k, int iter){
 
     Mat labelsImg = labels.reshape(1, H); // CV_32S, HxW
     return labelsImg;
+}
+
+static cv::Mat meanshift(const cv::Mat& imgBGR8, int hs, float hc, float eps, int kmax)
+{
+    CV_Assert(imgBGR8.type() == CV_8UC3);
+
+    const int H = imgBGR8.rows, W = imgBGR8.cols;
+    const float hc2  = hc * hc;
+    const float eps2 = eps * eps;
+
+    cv::Mat cur, next;
+    imgBGR8.convertTo(cur, CV_32FC3);
+    next.create(H, W, CV_32FC3);
+
+    for (int it = 0; it < kmax; ++it) {
+        float maxShift2 = 0.f;
+
+        for (int y = 0; y < H; ++y) {
+            const cv::Vec3f* curRow = cur.ptr<cv::Vec3f>(y);
+            cv::Vec3f* nextRow = next.ptr<cv::Vec3f>(y);
+
+            for (int x = 0; x < W; ++x) {
+
+                const cv::Vec3f c0 = curRow[x];  // couleur courante du pixel central
+
+                const int ymin = std::max(0, y - hs);
+                const int ymax = std::min(H - 1, y + hs);
+                const int xmin = std::max(0, x - hs);
+                const int xmax = std::min(W - 1, x + hs);
+
+                cv::Vec3f sum(0,0,0);
+                int count = 0;
+
+                for (int yy = ymin; yy <= ymax; ++yy) {
+                    const cv::Vec3f* rowN = cur.ptr<cv::Vec3f>(yy);
+                    for (int xx = xmin; xx <= xmax; ++xx) {
+                        const cv::Vec3f cN = rowN[xx];
+
+                        cv::Vec3f d = cN - c0;
+                        float d2 = d.dot(d);
+                        if (d2 <= hc2) {
+                            sum += cN;
+                            ++count;
+                        }
+                    }
+                }
+
+                cv::Vec3f mean = (count > 0) ? (sum * (1.f / (float)count)) : c0;
+
+                cv::Vec3f diff = mean - c0;
+                float shift2 = diff.dot(diff);
+                if (shift2 > maxShift2) maxShift2 = shift2;
+
+                nextRow[x] = mean;
+            }
+        }
+
+        cur = next.clone();              // mise à jour globale
+        if (maxShift2 <= eps2) break;    // critère d’arrêt
+    }
+
+    // image segmentée (quantifiée) : conversion en 8U pour sauver/debug
+    cv::Mat out8;
+    cur.convertTo(out8, CV_8UC3);
+    return out8;
 }
 
 int main(int argc, char** argv)
@@ -227,6 +293,11 @@ int main(int argc, char** argv)
         "{help h usage ?   |       | print this message   }"
         "{input i          |<none> | input image file     }"
         "{k                |<none> | number of clusters   }"
+        "{type t           |0      | Type of kmeans used (0=OpenCV, 1=Perso, 2=Meanshift) }"
+        "{hs               |15     | mean-shift spatial bandwidth (pixels) }"
+        "{hc               |35     | mean-shift color bandwidth (0..255)   }"
+        "{eps e            |0.5    | mean-shift convergence threshold      }"
+        "{kmax             |25     | mean-shift max iterations per pixel   }"
         "{groundtruth gt   |       | ground truth segmentation image (optional) }";
 
     CommandLineParser parser(argc, argv, keys);
@@ -240,8 +311,13 @@ int main(int argc, char** argv)
 
     const string imageFilename = parser.get<string>("input");
     const int k = parser.get<int>("k");
+    const int type = parser.get<int>("type");
     const string groundTruthFilename = parser.get<string>("groundtruth");
     const int iterations = parser.get<int>("iterations");
+    const float hs = parser.get<float>("hs");
+    const float hc = parser.get<float>("hc");
+    const float ms_eps = parser.get<float>("eps");
+    const int kmax = parser.get<int>("kmax");
 
     if (!parser.check())
     {
@@ -279,32 +355,63 @@ int main(int argc, char** argv)
     Mat v = convertM.reshape(3, 2, shape);
     double epsilon = 1e-4;
     Mat centers;
+    Mat Labels;
+    Mat mask255;
+    //String utiles pour enregistrer les resultats dans res
+    path inPath(imageFilename);
+    std::string stem = inPath.stem().string();
+    path outDir = path("../res");
+    string typeStr;
+    if (type == 0){
+        typeStr = "opencv";
+    } else if (type == 1){
+        typeStr = "kmeans_perso";
+    } else if (type == 2){
+        typeStr = "meanshift";
+    }
 
     // now we can call kmeans(...)
-    double res = kmeans(v,k,labels,TermCriteria(TermCriteria::MAX_ITER,iterations,epsilon),3,KMEANS_RANDOM_CENTERS,centers);
-    Mat labelsPerso = kmeans_perso(m,2,100);
+    if (type == 0){
+        cout << "Running OpenCV kmeans..." << endl;
+        kmeans(v,k,labels,TermCriteria(TermCriteria::MAX_ITER,iterations,epsilon),3,KMEANS_RANDOM_CENTERS,centers);
+        Labels = labels.reshape(1,m.rows).clone();
+        Labels.convertTo(mask255, CV_8U, 255.0);
+    } else if (type == 1){
+        cout << "Running Perso kmeans..." << endl;
+        Labels = kmeans_perso(m,2,100).clone();
+        Labels.convertTo(mask255, CV_8U, 255.0);
+    } else if (type == 2){
+        cout << "Running MeanShift..." << endl;
+        if (m.empty()) {
+            cerr << "Error: input image is empty." << endl;
+            return EXIT_FAILURE;
+        }
+        Mat segColor = meanshift(m, hs, hc, ms_eps, kmax);
+        //DEBUG
+        PRINT_MAT_INFO(segColor);
+        imwrite("../res/meanshift_" + stem + "_color.png", segColor);
+        Mat segGray;
+        cvtColor(segColor, segGray, COLOR_BGR2GRAY);
+        //mask255
+        threshold(segGray, mask255, 0, 255, THRESH_BINARY | THRESH_OTSU);
+    } else {
+        cout << "Invalid type parameter. Use 0 for OpenCV, 1 for Perso, 2 for MeanShift." << endl;
+        return EXIT_FAILURE;
+    }
 
-    PRINT_MAT_INFO(labelsPerso);
-
-    Mat labels2D = labels.reshape(1,m.rows);
-
-    Mat mask255;
-    Mat perso255;
-    labels2D.convertTo(mask255, CV_8U, 255.0);
-    labelsPerso.convertTo(perso255, CV_8U, 255.0);
-
-    imwrite("../res/fond_forme.png",mask255);
-    imwrite("../res/fond_forme_perso.png",perso255);
-    Mat gt;
+    path outPath = outDir / (stem +"_" + typeStr + "_mask.png");
+    imwrite(outPath.string(), mask255);
     if (!groundTruthFilename.empty()){
+        Mat gt;
         Mat gt16 = imread(groundTruthFilename,IMREAD_GRAYSCALE);
         gt16.convertTo(gt, CV_8U);
-        cout<<"type gt = "<<gt.type()<<endl;
-        cout<<"type pred = "<<mask255.type()<<endl;
-        cout<<"type pred = "<<perso255.type()<<endl;
-        //Kmeans OpenCV
+
         Mat pred_pos = (mask255>0);
         Mat gt_pos = (gt==0);
+        if (type == 0) gt_pos = (gt==0);
+        if (type == 1) gt_pos = (gt==0);
+        if (type == 2) gt_pos = (gt>0);
+
 
         Mat TPmat = pred_pos & gt_pos;
         Mat FPmat = pred_pos & (~gt_pos);
@@ -317,25 +424,6 @@ int main(int argc, char** argv)
         double P = div(TP,TP+FP);
         double S = div(TP,TP+FN);
         double DSC = div(2.0*TP,2.0*TP+FP+FN);
-        cout<< "OPENCV"<<endl;
-        cout<< "P = "<< P <<endl;
-        cout<< "S = "<< S <<endl;
-        cout<< "DSC = "<< DSC <<endl;
-        //Kmeans Perso
-        pred_pos = (perso255>0);
-
-        TPmat = pred_pos & gt_pos;
-        FPmat = pred_pos & (~gt_pos);
-        FNmat = (~pred_pos) & gt_pos;
-
-        TP=static_cast<double>(countNonZero(TPmat));
-        FP=static_cast<double>(countNonZero(FPmat));
-        FN=static_cast<double>(countNonZero(FNmat));
-
-        P = div(TP,TP+FP);
-        S = div(TP,TP+FN);
-        DSC = div(2.0*TP,2.0*TP+FP+FN);
-        cout<< "Perso"<<endl;
         cout<< "P = "<< P <<endl;
         cout<< "S = "<< S <<endl;
         cout<< "DSC = "<< DSC <<endl;

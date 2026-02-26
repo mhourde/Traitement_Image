@@ -8,8 +8,8 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/mhe9472/2A/Trait_Images/codes_TP/src/tp/kmeans.cpp" "src/tp/CMakeFiles/kmeans.dir/kmeans.cpp.o" "gcc" "src/tp/CMakeFiles/kmeans.dir/kmeans.cpp.o.d"
-  "/home/mhe9472/2A/Trait_Images/codes_TP/src/tp/ocv_utils.cpp" "src/tp/CMakeFiles/kmeans.dir/ocv_utils.cpp.o" "gcc" "src/tp/CMakeFiles/kmeans.dir/ocv_utils.cpp.o.d"
+  "/Users/mhandfares/Desktop/N7/My_Course/2A/Traitement_Image/src/tp/kmeans.cpp" "src/tp/CMakeFiles/kmeans.dir/kmeans.cpp.o" "gcc" "src/tp/CMakeFiles/kmeans.dir/kmeans.cpp.o.d"
+  "/Users/mhandfares/Desktop/N7/My_Course/2A/Traitement_Image/src/tp/ocv_utils.cpp" "src/tp/CMakeFiles/kmeans.dir/ocv_utils.cpp.o" "gcc" "src/tp/CMakeFiles/kmeans.dir/ocv_utils.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.

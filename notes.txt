@@ -1,0 +1,4 @@
+Mean-Shift :
+Texture8 marche le mieux avec hs=20, hc =35, e=0.5, kmax=20
+Texture3 marche très bien
+Texture 11 marche aussi bien que les autres kmeans car lumières hautes sur les pierres
