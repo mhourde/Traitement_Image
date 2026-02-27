@@ -294,10 +294,10 @@ int main(int argc, char** argv)
         "{input i          |<none> | input image file     }"
         "{k                |<none> | number of clusters   }"
         "{type t           |0      | Type of kmeans used (0=OpenCV, 1=Perso, 2=Meanshift) }"
-        "{hs               |15     | mean-shift spatial bandwidth (pixels) }"
+        "{hs               |20     | mean-shift spatial bandwidth (pixels) }"
         "{hc               |35     | mean-shift color bandwidth (0..255)   }"
         "{eps e            |0.5    | mean-shift convergence threshold      }"
-        "{kmax             |25     | mean-shift max iterations per pixel   }"
+        "{kmax             |20     | mean-shift max iterations per pixel   }"
         "{groundtruth gt   |       | ground truth segmentation image (optional) }";
 
     CommandLineParser parser(argc, argv, keys);
@@ -378,7 +378,7 @@ int main(int argc, char** argv)
         Labels.convertTo(mask255, CV_8U, 255.0);
     } else if (type == 1){
         cout << "Running Perso kmeans..." << endl;
-        Labels = kmeans_perso(m,2,100).clone();
+        Labels = kmeans_perso(m,k,iterations).clone();
         Labels.convertTo(mask255, CV_8U, 255.0);
     } else if (type == 2){
         cout << "Running MeanShift..." << endl;
@@ -408,8 +408,8 @@ int main(int argc, char** argv)
 
         Mat pred_pos = (mask255>0);
         Mat gt_pos = (gt==0);
-        if (type == 0) gt_pos = (gt==0);
-        if (type == 1) gt_pos = (gt==0);
+        if (type == 0) gt_pos = (gt>0);
+        if (type == 1) gt_pos = (gt>0);
         if (type == 2) gt_pos = (gt>0);
 
 
