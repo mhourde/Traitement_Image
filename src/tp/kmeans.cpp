@@ -401,33 +401,74 @@ int main(int argc, char** argv)
 
     path outPath = outDir / (stem +"_" + typeStr + "_mask.png");
     imwrite(outPath.string(), mask255);
-    if (!groundTruthFilename.empty()){
-        Mat gt;
-        Mat gt16 = imread(groundTruthFilename,IMREAD_GRAYSCALE);
-        gt16.convertTo(gt, CV_8U);
+    if (!groundTruthFilename.empty()) {
+        cv::Mat gt = cv::imread(groundTruthFilename, cv::IMREAD_GRAYSCALE);
+        if (gt.empty()) {
+            std::cerr << "Error: cannot read ground truth: " << groundTruthFilename << std::endl;
+            return EXIT_FAILURE;
+        }
 
-        Mat pred_pos = (mask255>0);
-        Mat gt_pos = (gt==0);
-        if (type == 0) gt_pos = (gt>0);
-        if (type == 1) gt_pos = (gt>0);
-        if (type == 2) gt_pos = (gt>0);
+        // Force GT to strict binary 0/255
+        cv::threshold(gt, gt, 0, 255, cv::THRESH_BINARY);
 
+        auto eval = [&](const cv::Mat& predMask255, const cv::Mat& gtMask255) {
+            cv::Mat pred_pos = (predMask255 > 0); // "forme"
+            cv::Mat gt_pos   = (gtMask255 > 0);   // "forme"
 
-        Mat TPmat = pred_pos & gt_pos;
-        Mat FPmat = pred_pos & (~gt_pos);
-        Mat FNmat = (~pred_pos) & gt_pos;
+            cv::Mat TPmat = pred_pos & gt_pos;
+            cv::Mat FPmat = pred_pos & (~gt_pos);
+            cv::Mat FNmat = (~pred_pos) & gt_pos;
 
-        double TP=static_cast<double>(countNonZero(TPmat));
-        double FP=static_cast<double>(countNonZero(FPmat));
-        double FN=static_cast<double>(countNonZero(FNmat));
+            double TP = (double)cv::countNonZero(TPmat);
+            double FP = (double)cv::countNonZero(FPmat);
+            double FN = (double)cv::countNonZero(FNmat);
 
-        double P = div(TP,TP+FP);
-        double S = div(TP,TP+FN);
-        double DSC = div(2.0*TP,2.0*TP+FP+FN);
-        cout<< "P = "<< P <<endl;
-        cout<< "S = "<< S <<endl;
-        cout<< "DSC = "<< DSC <<endl;
+            double P   = div(TP, TP + FP);
+            double S   = div(TP, TP + FN);
+            double DSC = div(2.0 * TP, 2.0 * TP + FP + FN);
+
+            return std::tuple<double,double,double>(P, S, DSC);
+        };
+
+        cv::Mat pred0 = mask255;
+        cv::Mat pred1; cv::bitwise_not(pred0, pred1);
+
+        cv::Mat gt0 = gt;
+        cv::Mat gt1; cv::bitwise_not(gt0, gt1);
+
+        // Tester les 4 combinaisons de flips possibles pour trouver celle qui maximise le DSC
+        struct Res { double P, S, DSC; int flipPred; int flipGT; };
+        Res best{0.0, 0.0, -1.0, 0, 0};
+
+        auto tryCombo = [&](int fp, int fg) {
+            const cv::Mat& pm = (fp ? pred1 : pred0);
+            const cv::Mat& gm = (fg ? gt1   : gt0);
+            auto [P,S,DSC] = eval(pm, gm);
+            if (DSC > best.DSC) best = Res{P,S,DSC,fp,fg};
+        };
+
+        tryCombo(0,0);
+        tryCombo(1,0);
+        tryCombo(0,1);
+        tryCombo(1,1);
+
+        // Avertissement si même le meilleur DSC est faible
+        const double DSC_WARN = 0.40; // tu peux ajuster
+        if (best.DSC < DSC_WARN) {
+            std::cerr << "[warn] Best DSC still low (" << best.DSC
+                    << "). Check parameters / segmentation quality.\n";
+        }
+
+        // Appliquer les flips trouvés pour la meilleure orientation
+        if (best.flipPred) mask255 = pred1;
+        if (best.flipGT)   gt      = gt1;
+
+        std::cout << "Auto-orientation: flipPred=" << best.flipPred
+                << " flipGT=" << best.flipGT << std::endl;
+
+        std::cout << "P = " << best.P << std::endl;
+        std::cout << "S = " << best.S << std::endl;
+        std::cout << "DSC = " << best.DSC << std::endl;
     }
-
     return EXIT_SUCCESS;
 }

@@ -8,7 +8,7 @@ set(CMAKE_DEPENDS_LANGUAGES
 
 # The set of dependency files which are needed:
 set(CMAKE_DEPENDS_DEPENDENCY_FILES
-  "/home/mhe9472/2A/Trait_Images/codes_TP/src/tutorials/load_modify_image.cpp" "src/tutorials/CMakeFiles/load_modify_image.dir/load_modify_image.cpp.o" "gcc" "src/tutorials/CMakeFiles/load_modify_image.dir/load_modify_image.cpp.o.d"
+  "/Users/mhandfares/Desktop/N7/My_Course/2A/Traitement_Image/src/tutorials/load_modify_image.cpp" "src/tutorials/CMakeFiles/load_modify_image.dir/load_modify_image.cpp.o" "gcc" "src/tutorials/CMakeFiles/load_modify_image.dir/load_modify_image.cpp.o.d"
   )
 
 # Targets to which this target links which contain Fortran sources.
